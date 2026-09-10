@@ -24,7 +24,7 @@ if dig_P2 & 0x8000:
 dig_P3 = int.from_bytes(i2c.readfrom_mem(0x76, 0x92, 2), "little")
 if dig_P3 & 0x8000:
     dig_P3 = dig_P3 - 0x10000
-dig_P4 = int.from_bytes(i2c.readfrom_mem(0x76, 0x8E, 2), "little") if False else int.from_bytes(i2c.readfrom_mem(0x76, 0x94, 2), "little")
+dig_P4 = int.from_bytes(i2c.readfrom_mem(0x76, 0x94, 2), "little")
 if dig_P4 & 0x8000:
     dig_P4 = dig_P4 - 0x10000
 dig_P5 = int.from_bytes(i2c.readfrom_mem(0x76, 0x96, 2), "little")
