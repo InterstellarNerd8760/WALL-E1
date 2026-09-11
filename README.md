@@ -8,9 +8,8 @@ Weather-balloon flight computer. Payload collects atmospheric data onboard and w
 
 - Raspberry Pi Pico, MicroPython
 - BME280 on I2C0: SDA=GP0, SCL=GP1, address `0x76`
-- Waveshare Pico-LoRa SX1262 (HF, 850–930 MHz) — stacked HAT once Pico has headers
+- Waveshare Pico-LoRa SX1262 (HF, 850–930 MHz) — stacked HAT
 - IPEX-1 pigtail seated on the HAT U.FL jack
-- SD logging and LoRa TX not in firmware yet
 
 ## Deploy to the Pico (Thonny)
 
@@ -33,11 +32,9 @@ Firmware matches the last working Thonny script, including bugs we already know:
 
 - Humidity calibration bytes are wrong (H1 length, H4/H5 packing, missing H6).
 - `ctrl_hum` (`0xF2`) is never written, so humidity may not be sampled.
-- Humidity compensation is not the Bosch formula.
+- Humidity compensation is not the Bosch ormula.f
 - Recurring I2C `EIO` is intermittent contact/solder on the BME280, not this script. Works when pins are pressed.
-- No altitude, no SD log, no LoRa.
-
-The email paste of this file had a broken `dig_H5` line. The repo version uses the project snapshot from 2026-08-28 (`wall_e1_current.py`), with the no-op H5 sign-extend turned into a real assignment so the file is valid Python.
+- No altitude, no LoRa.
 
 ## Planned layout
 
