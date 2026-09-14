@@ -26,22 +26,32 @@ This is not a compiled firmware image. The Pico runs MicroPython; Thonny copies 
 
 If Thonny drops `/dev/cu.usbmodem…` or the Mac USB serial dies, that is separate from BME280 `OSError: [Errno 5] EIO`. Unplug, wait, replug; do not treat a serial crash as an I2C bug.
 
+## Mission Control
+
+Ground dashboard lives in `mission-control/`. Open `mission-control/index.html` in a browser — no build step.
+
+Current UI is a simulated flight (Fair Oaks launch, baro telemetry, LoRa packet log, SpotTrace-shaped track). Live Pico / SX1262 / FindMeSPOT ingest is not wired yet.
+
+Layout: left telemetry + altitude graph, center map, right LoRa log, bottom system status.
+
 ## Known issues in this snapshot
 
 Firmware matches the last working Thonny script, including bugs we already know:
 
 - Humidity calibration bytes are wrong (H1 length, H4/H5 packing, missing H6).
 - `ctrl_hum` (`0xF2`) is never written, so humidity may not be sampled.
-- Humidity compensation is not the Bosch ormula.f
+- Humidity compensation is not the Bosch formula.
 - Recurring I2C `EIO` is intermittent contact/solder on the BME280, not this script. Works when pins are pressed.
-- No altitude, no LoRa.
+- No altitude, no LoRa in firmware yet.
 
-## Planned layout
+## Layout
 
 ```
 firmware/          # Pico MicroPython (this is the flight computer)
   main.py
-mission-control/   # ground dashboard — design owned by Weston; scaffolding later
+mission-control/   # ground dashboard — design owned by Weston
+  index.html
+  README.md
 docs/
 ```
 
