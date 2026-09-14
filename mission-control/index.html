@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WALL-E1 Mission Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --panel: #12161c;
+      --panel-2: #181e26;
+      --line: #2a3340;
+      --text: #e8edf4;
+      --muted: #8b97a8;
+      --amber: #e8b84a;
+      --cyan: #5ad0c8;
+      --green: #3dce7a;
+      --red: #e85d5d;
+      --warn: #e8b84a;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text);
+      font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
+    body { display: grid; grid-template-rows: 52px 1fr 118px; min-height: 100%; overflow: hidden; }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; border-bottom: 1px solid var(--line); background: #0e1217;
+    }
+    .brand { display: flex; align-items: baseline; gap: 12px; }
+    .brand h1 { font-size: 14px; letter-spacing: 0.2em; font-weight: 600; }
+    .brand span { color: var(--muted); font-size: 11px; letter-spacing: 0.1em; }
+    .header-meta { display: flex; align-items: center; gap: 20px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; font-family: var(--mono); }
+    .header-meta b { color: var(--text); font-weight: 500; }
+    .phase { color: var(--amber); letter-spacing: 0.1em; }
+    .controls { display: flex; gap: 6px; }
+    button {
+      background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+      font-family: inherit; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 6px 10px; cursor: pointer;
+    }
+    button:hover { border-color: var(--cyan); color: var(--cyan); }
+    button.on { border-color: var(--amber); color: var(--amber); }
+
+    .main { display: grid; grid-template-columns: 292px 1fr 268px; min-height: 0; }
+
+    aside, .comms {
+      background: var(--panel);
+      padding: 12px;
+      display: flex; flex-direction: column; gap: 10px; min-height: 0;
+    }
+    aside { border-right: 1px solid var(--line); }
+    .comms { border-left: 1px solid var(--line); }
+    .label {
+      font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+    }
+    .telemetry { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .tile {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      padding: 8px 9px 7px;
+    }
+    .tile .v { font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.15; font-family: var(--mono); }
+    .tile .u { font-size: 10px; color: var(--muted); margin-left: 3px; font-family: "IBM Plex Sans", sans-serif; }
+    .tile.wide { grid-column: 1 / -1; }
+    .spot {
+      font-size: 12px; color: var(--muted); line-height: 1.45;
+      border: 1px solid var(--line); background: var(--panel-2); padding: 8px 10px;
+    }
+    .spot strong { color: var(--cyan); font-weight: 600; }
+    .graph-wrap { flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 6px; }
+    canvas { width: 100%; height: 100%; background: #0c1015; border: 1px solid var(--line); }
+
+    #map { width: 100%; height: 100%; background: #0a0e13; }
+    .leaflet-container { background: #0a0e13; font-family: inherit; }
+    .map-hud {
+      position: absolute; z-index: 500; top: 12px; left: 12px;
+      background: rgba(12,16,21,0.86); border: 1px solid var(--line);
+      padding: 8px 10px; font-size: 11px; line-height: 1.45; pointer-events: none;
+      font-family: var(--mono); color: var(--muted);
+    }
+    .map-hud b { color: var(--text); font-weight: 500; }
+
+    .pkt-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .pkt-head span { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+    #log {
+      flex: 1; min-height: 0; overflow: auto;
+      background: #0c1015; border: 1px solid var(--line);
+      padding: 8px; font-family: var(--mono); font-size: 11px; line-height: 1.55;
+      color: #9aa8b8;
+    }
+    #log .rx { color: var(--cyan); }
+    #log .sys { color: var(--amber); }
+    #log .drop { color: var(--red); }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .hint { font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
+
+    footer {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      border-top: 1px solid var(--line);
+      background: #0e1217;
+    }
+    .sys {
+      padding: 10px 12px 8px;
+      border-right: 1px solid var(--line);
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .sys:last-child { border-right: none; }
+    .sys .name { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+    .sys .state { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .dot.ok { background: var(--green); box-shadow: 0 0 8px rgba(61,206,122,0.55); }
+    .dot.warn { background: var(--warn); box-shadow: 0 0 8px rgba(232,184,74,0.45); }
+    .dot.bad { background: var(--red); box-shadow: 0 0 8px rgba(232,93,93,0.45); }
+    .sys .detail { font-size: 11px; color: var(--muted); }
+    .sim-note {
+      position: fixed; right: 12px; bottom: 130px; z-index: 500;
+      font-size: 10px; color: var(--muted); background: rgba(11,13,16,0.85);
+      border: 1px solid var(--line); padding: 5px 8px; letter-spacing: 0.06em;
+    }
+
+    @media (max-width: 980px) {
+      body { grid-template-rows: 52px 1fr auto; overflow: auto; }
+      .main { grid-template-columns: 1fr; grid-template-rows: auto 420px 220px; }
+      footer { grid-template-columns: 1fr 1fr; }
+      aside, .comms { max-height: none; }
+      .graph-wrap { height: 160px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>WALL-E1</h1>
+      <span>MISSION CONTROL</span>
+    </div>
+    <div class="header-meta">
+      <div>MET <b id="met">00:00:00</b></div>
+      <div>UTC <b id="utc">--:--:--</b></div>
+      <div class="phase">PHASE <b id="phase">PRELAUNCH</b></div>
+    </div>
+    <div class="controls">
+      <button id="btn-pause" type="button">Pause</button>
+      <button id="btn-fast" type="button">10×</button>
+      <button id="btn-reset" type="button">Reset</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside>
+      <div class="label">Payload telemetry</div>
+      <div class="telemetry">
+        <div class="tile"><div class="label">Temp</div><div class="v" id="t">--</div></div>
+        <div class="tile"><div class="label">Pressure</div><div class="v" id="p">--</div></div>
+        <div class="tile"><div class="label">Humidity</div><div class="v" id="h">--</div></div>
+        <div class="tile"><div class="label">Alt (baro)</div><div class="v" id="alt">--</div></div>
+        <div class="tile"><div class="label">Ascent</div><div class="v" id="roc">--</div></div>
+        <div class="tile"><div class="label">Max alt</div><div class="v" id="maxalt">--</div></div>
+        <div class="tile wide"><div class="label">Last packet</div><div class="v" style="font-size:13px" id="pkt">waiting for LoRa</div></div>
+      </div>
+      <div class="spot">
+        <div class="label">SpotTrace</div>
+        <div><strong id="spot-type">UNLIMITED-TRACK</strong> · batt <span id="spot-batt">GOOD</span></div>
+        <div id="spot-ll">38.64460°N  121.27220°W</div>
+        <div>age <span id="spot-age">sim</span> · ESN WALL-E1-TRACE</div>
+      </div>
+      <div class="graph-wrap">
+        <div class="label">Altitude · last ~8 min <span id="gmax" style="float:right;letter-spacing:0"></span></div>
+        <canvas id="graph" width="540" height="280"></canvas>
+      </div>
+    </aside>
+    <div id="map">
+      <div class="map-hud">
+        <div>POS <b id="hud-ll">--</b></div>
+        <div>HDG <b id="hud-hdg">---°</b> · GND <b id="hud-spd">-- m/s</b></div>
+        <div>RNG <b id="hud-rng">0.0 km</b> · PKT <b id="hud-n">0</b></div>
+      </div>
+    </div>
+    <div class="comms">
+      <div class="pkt-head">
+        <div class="label">LoRa downlink</div>
+        <span id="link">915.0 MHz · sim</span>
+      </div>
+      <div class="stats">
+        <div class="tile"><div class="label">RSSI</div><div class="v" id="rssi">--</div></div>
+        <div class="tile"><div class="label">SNR</div><div class="v" id="snr">--</div></div>
+      </div>
+      <div id="log"></div>
+      <div class="hint">space pause · f 10× · r reset · all values simulated</div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="sys">
+      <div class="name">Pico</div>
+      <div class="state"><span class="dot ok"></span>USB / boot</div>
+      <div class="detail">MicroPython · main.py</div>
+    </div>
+    <div class="sys">
+      <div class="name">BME280</div>
+      <div class="state"><span class="dot warn"></span><span>Intermittent I2C</span></div>
+      <div class="detail">0x76 · GP0/GP1 · EIO when loose</div>
+    </div>
+    <div class="sys">
+      <div class="name">LoRa SX1262</div>
+      <div class="state"><span class="dot warn" id="dot-lora"></span><span id="st-lora">Sim TX only</span></div>
+      <div class="detail">HF 915 · IPEX seated</div>
+    </div>
+    <div class="sys">
+      <div class="name">SD log</div>
+      <div class="state"><span class="dot bad"></span>Not in firmware</div>
+      <div class="detail">Onboard store not started</div>
+    </div>
+    <div class="sys">
+      <div class="name">SpotTrace</div>
+      <div class="state"><span class="dot ok"></span>Sim feed</div>
+      <div class="detail">Replace with FindMeSPOT push</div>
+    </div>
+    <div class="sys">
+      <div class="name">Battery</div>
+      <div class="state"><span class="dot warn"></span>HAT LiPo TBD</div>
+      <div class="detail">PH1.25 on HAT · USB now</div>
+    </div>
+    <div class="sys">
+      <div class="name">RF / antenna</div>
+      <div class="state"><span class="dot ok"></span>Pigtail seated</div>
+      <div class="detail">IPEX-1 → SMA · ANT_SW GP22</div>
+    </div>
+  </footer>
+  <div class="sim-note">SIMULATED TRACK + TELEMETRY</div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const LAUNCH = { lat: 38.6446, lon: -121.2722 };
+    const BURST_M = 28500;
+    const TICK_MS = 1000;
+
+    let t0 = Date.now();
+    let simMs = 0;
+    let paused = false;
+    let speed = 1;
+    let pktN = 0;
+    let maxAlt = 0;
+    let last = null;
+    const altHist = [];
+    const track = [];
+
+    const map = L.map("map", { zoomControl: false, attributionControl: true }).setView([LAUNCH.lat, LAUNCH.lon], 10);
+    L.control.zoom({ position: "topright" }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Tiles &copy; Esri",
+      maxZoom: 16
+    }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 16
+    }).addTo(map);
+
+    const path = L.polyline([], { color: "#5ad0c8", weight: 2.5, opacity: 0.9 }).addTo(map);
+    const probe = L.circleMarker([LAUNCH.lat, LAUNCH.lon], {
+      radius: 8, color: "#0b0d10", weight: 2, fillColor: "#e8b84a", fillOpacity: 1
+    }).addTo(map).bindPopup("WALL-E1");
+    L.circle([LAUNCH.lat, LAUNCH.lon], { radius: 80, color: "#8b97a8", weight: 1, fill: false, dashArray: "3 4" }).addTo(map);
+    L.circleMarker([LAUNCH.lat, LAUNCH.lon], {
+      radius: 4, color: "#8b97a8", weight: 1, fillColor: "#8b97a8", fillOpacity: 1
+    }).addTo(map).bindTooltip("LAUNCH", { permanent: false });
+    [5000, 15000, 30000].forEach((r) => {
+      L.circle([LAUNCH.lat, LAUNCH.lon], { radius: r, color: "#2a3340", weight: 1, fill: false }).addTo(map);
+    });
+    const pred = L.circleMarker([LAUNCH.lat, LAUNCH.lon], {
+      radius: 6, color: "#e85d5d", weight: 1, fillColor: "#e85d5d", fillOpacity: 0.35, dashArray: "2 3"
+    }).addTo(map).bindTooltip("PRED LAND");
+
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function fmtMet(ms) {
+      const s = Math.floor(ms / 1000);
+      return pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60);
+    }
+    function pressureFromAlt(m) {
+      return 1013.25 * Math.pow(Math.max(0.01, 1 - (0.0065 * m) / 288.15), 5.255);
+    }
+    function haversineKm(a, b) {
+      const R = 6371;
+      const dLat = (b.lat - a.lat) * Math.PI / 180;
+      const dLon = (b.lon - a.lon) * Math.PI / 180;
+      const s = Math.sin(dLat / 2) ** 2 +
+        Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(s));
+    }
+    function bearing(a, b) {
+      const φ1 = a.lat * Math.PI / 180, φ2 = b.lat * Math.PI / 180;
+      const Δ = (b.lon - a.lon) * Math.PI / 180;
+      const y = Math.sin(Δ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δ);
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+    function logLine(cls, text) {
+      const el = document.getElementById("log");
+      const row = document.createElement("div");
+      row.className = cls;
+      row.textContent = text;
+      el.appendChild(row);
+      while (el.children.length > 80) el.removeChild(el.firstChild);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function sample(elapsed) {
+      // Hold, climb ~5.1 m/s, burst, chute descent ~7.5 m/s
+      const hold = 12;
+      let alt, phase, roc;
+      if (elapsed < hold) {
+        alt = 32 + Math.sin(elapsed) * 0.4;
+        roc = 0;
+        phase = "PRELAUNCH";
+      } else {
+        const climb = (elapsed - hold) * 5.1;
+        if (climb < BURST_M) {
+          alt = 32 + climb + Math.sin(elapsed / 7) * 12;
+          roc = 5.1 + Math.sin(elapsed / 11) * 0.2;
+          phase = "ASCENT";
+        } else {
+          const after = climb - BURST_M;
+          const down = after * 7.5 / 5.1;
+          alt = Math.max(40, BURST_M - down + Math.sin(elapsed / 5) * 8);
+          roc = alt <= 45 ? 0 : -7.5 + Math.sin(elapsed / 9) * 0.25;
+          phase = alt <= 45 ? "LANDED / SIM" : "DESCENT";
+          if (climb < BURST_M + 8) phase = "BURST";
+        }
+      }
+      const wind = Math.min(1, alt / 18000);
+      const lat = LAUNCH.lat + elapsed * 0.000055 * (0.4 + wind) + Math.sin(elapsed / 90) * 0.003 * wind;
+      const lon = LAUNCH.lon + elapsed * 0.00008 * (0.5 + wind) + Math.cos(elapsed / 70) * 0.003 * wind;
+      const temp = 18.6 - alt * 0.0065 + Math.sin(elapsed / 9) * 0.15;
+      const hum = Math.max(3, 46 - alt / 420 + Math.sin(elapsed / 13) * 1.2);
+      const pres = pressureFromAlt(Math.max(0, alt)) + Math.sin(elapsed) * 0.08;
+      return { elapsed, alt, lat, lon, temp, pres, hum, roc, phase };
+    }
+
+    function predictLand(s) {
+      // Crude: keep current wind vector until ground
+      if (s.alt <= 50 || s.roc >= 0) return { lat: s.lat, lon: s.lon };
+      const remain = s.alt / 7.5;
+      const dlat = (s.lat - LAUNCH.lat) / Math.max(1, s.elapsed);
+      const dlon = (s.lon - LAUNCH.lon) / Math.max(1, s.elapsed);
+      return { lat: s.lat + dlat * remain * 0.7, lon: s.lon + dlon * remain * 0.7 };
+    }
+
+    function drawGraph() {
+      const c = document.getElementById("graph");
+      const ctx = c.getContext("2d");
+      const w = c.width, h = c.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.strokeStyle = "#2a3340";
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const y = (h * i) / 4;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+      if (altHist.length < 2) return;
+      const maxA = Math.max(400, ...altHist);
+      document.getElementById("gmax").textContent = Math.round(maxA) + " m";
+      ctx.beginPath();
+      ctx.strokeStyle = "#e8b84a";
+      ctx.lineWidth = 2;
+      altHist.forEach((a, i) => {
+        const x = (i / (altHist.length - 1)) * w;
+        const y = h - (a / maxA) * (h - 10) - 5;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    function emitPacket(s) {
+      pktN += 1;
+      const rssi = Math.round(-48 - s.alt / 900 - Math.random() * 6);
+      const snr = (9.4 - s.alt / 8000 + (Math.random() - 0.5)).toFixed(1);
+      const line = "W1 T=" + s.temp.toFixed(2) +
+        " P=" + s.pres.toFixed(1) +
+        " H=" + s.hum.toFixed(1) +
+        " A=" + Math.round(s.alt);
+      document.getElementById("pkt").textContent = line;
+      document.getElementById("rssi").innerHTML = rssi + '<span class="u">dBm</span>';
+      document.getElementById("snr").innerHTML = snr + '<span class="u">dB</span>';
+      document.getElementById("hud-n").textContent = String(pktN);
+      document.getElementById("st-lora").textContent = "Sim RX · " + pktN + " pkts";
+      const drop = Math.random() < (s.alt > 20000 ? 0.08 : 0.02);
+      const ts = fmtMet(simMs);
+      if (drop) {
+        logLine("drop", ts + "  DROP  crc/timeout");
+      } else {
+        logLine("rx", ts + "  RX    " + line + "  rssi=" + rssi);
+      }
+    }
+
+    function tick() {
+      if (!paused) simMs += TICK_MS * speed;
+      const now = Date.now();
+      const s = sample(simMs / 1000);
+      document.getElementById("met").textContent = fmtMet(simMs);
+      document.getElementById("utc").textContent = new Date(now).toISOString().slice(11, 19);
+      document.getElementById("t").innerHTML = s.temp.toFixed(2) + '<span class="u">°C</span>';
+      document.getElementById("p").innerHTML = s.pres.toFixed(1) + '<span class="u">hPa</span>';
+      document.getElementById("h").innerHTML = s.hum.toFixed(1) + '<span class="u">%</span>';
+      document.getElementById("alt").innerHTML = Math.round(s.alt) + '<span class="u">m</span>';
+      const rocStr = (s.roc >= 0 ? "+" : "") + s.roc.toFixed(1);
+      document.getElementById("roc").innerHTML = rocStr + '<span class="u">m/s</span>';
+      if (s.alt > maxAlt) maxAlt = s.alt;
+      document.getElementById("maxalt").innerHTML = Math.round(maxAlt) + '<span class="u">m</span>';
+      document.getElementById("spot-ll").textContent =
+        Math.abs(s.lat).toFixed(5) + "°N  " + Math.abs(s.lon).toFixed(5) + "°W";
+      document.getElementById("spot-age").textContent = "0s (sim)";
+      document.getElementById("phase").textContent = s.phase + " / SIM";
+
+      altHist.push(s.alt);
+      if (altHist.length > 480) altHist.shift();
+      drawGraph();
+
+      const ll = [s.lat, s.lon];
+      track.push(ll);
+      path.setLatLngs(track);
+      probe.setLatLng(ll);
+      const land = predictLand(s);
+      pred.setLatLng([land.lat, land.lon]);
+      if (track.length % 6 === 0) map.panTo(ll, { animate: true, duration: 0.4 });
+
+      let hdg = 0, spd = 0;
+      if (last) {
+        hdg = bearing(last, s);
+        const km = haversineKm(last, s);
+        const dt = Math.max(0.001, (simMs / 1000) - last.elapsed);
+        spd = (km * 1000) / dt;
+      }
+      last = s;
+      document.getElementById("hud-ll").textContent =
+        s.lat.toFixed(4) + "  " + s.lon.toFixed(4);
+      document.getElementById("hud-hdg").textContent = Math.round(hdg).toString().padStart(3, "0") + "°";
+      document.getElementById("hud-spd").textContent = spd.toFixed(1) + " m/s";
+      document.getElementById("hud-rng").textContent = haversineKm(LAUNCH, s).toFixed(2) + " km";
+
+      if (!paused && Math.floor(simMs / 3000) !== Math.floor((simMs - TICK_MS * speed) / 3000)) {
+        emitPacket(s);
+      }
+    }
+
+    function setPaused(v) {
+      paused = v;
+      document.getElementById("btn-pause").textContent = paused ? "Resume" : "Pause";
+      document.getElementById("btn-pause").classList.toggle("on", paused);
+    }
+    function setFast(v) {
+      speed = v ? 10 : 1;
+      document.getElementById("btn-fast").classList.toggle("on", speed === 10);
+      document.getElementById("btn-fast").textContent = speed === 10 ? "1×" : "10×";
+    }
+    function resetSim() {
+      t0 = Date.now();
+      simMs = 0;
+      pktN = 0;
+      maxAlt = 0;
+      last = null;
+      altHist.length = 0;
+      track.length = 0;
+      path.setLatLngs([]);
+      probe.setLatLng([LAUNCH.lat, LAUNCH.lon]);
+      pred.setLatLng([LAUNCH.lat, LAUNCH.lon]);
+      map.setView([LAUNCH.lat, LAUNCH.lon], 10);
+      document.getElementById("log").innerHTML = "";
+      document.getElementById("pkt").textContent = "waiting for LoRa";
+      document.getElementById("rssi").textContent = "--";
+      document.getElementById("snr").textContent = "--";
+      document.getElementById("hud-n").textContent = "0";
+      logLine("sys", "00:00:00  SYS   simulator reset · Fair Oaks launch");
+      setPaused(false);
+    }
+
+    document.getElementById("btn-pause").onclick = () => setPaused(!paused);
+    document.getElementById("btn-fast").onclick = () => setFast(speed !== 10);
+    document.getElementById("btn-reset").onclick = resetSim;
+    document.addEventListener("keydown", (e) => {
+      if (e.target.matches("input,textarea")) return;
+      if (e.key === " ") { e.preventDefault(); setPaused(!paused); }
+      if (e.key === "f" || e.key === "F") setFast(speed !== 10);
+      if (e.key === "r" || e.key === "R") resetSim();
+    });
+
+    logLine("sys", "00:00:00  SYS   mission control online · sim feed");
+    logLine("sys", "00:00:00  SYS   waiting first SX1262 packet");
+    tick();
+    setInterval(tick, TICK_MS);
+  </script>
+</body>
+</html>
