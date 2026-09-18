@@ -14,7 +14,7 @@ Payload will collect atmospheric data, log it onboard, and send telemetry to the
 ## Status
 
 - Firmware reads the BME280 over I2C and prints temp / pressure / humidity every ~3.14 s.
-- Humidity uses Bosch cal packing + `ctrl_hum` + datasheet compensation (merged).
+- Humidity uses Bosch cal packing, `ctrl_hum`, and datasheet compensation.
 - Part 97 station ID (`KO6OGZ WALL-E1`) prints on a separate 10-minute timer (serial stub until LoRa stacks).
 - No altitude, SD log, or LoRa TX in firmware yet.
 - Mission Control is a **simulated** flight so the UI can be built before radio works: Fair Oaks launch, baro-shaped telemetry, LoRa packet log, SpotTrace-shaped track.
