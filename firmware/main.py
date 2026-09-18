@@ -4,6 +4,12 @@ import utime
 
 print("=== WALL-E Flight Computer ===")
 
+# Part 97 station ID — separate from the ~3.14 s telemetry loop.
+# LoRa TX not wired yet (HAT cannot stack until Pico has headers).
+CALLSIGN = "KO6OGZ"
+ID_PAYLOAD = "KO6OGZ WALL-E1"
+ID_INTERVAL_MS = 10 * 60 * 1000  # 10 minutes
+
 i2c = I2C(0, sda=Pin(0), scl=Pin(1))
 
 # Calibration coefficients
@@ -109,7 +115,28 @@ def read_bme280():
     return temperature, pressure, humidity
 
 
+def send_station_id():
+    """Station ID callout (Part 97: at least every 10 minutes).
+
+    Serial-only for now. TODO(SX1262): TX ID_PAYLOAD over Waveshare Pico-LoRa
+    once the HAT is stacked — do not init SPI here (would risk wedging boot
+    without the radio present).
+    """
+    print(f"[ID] {ID_PAYLOAD}")
+
+
+# Fire ID on first loop pass, then every ID_INTERVAL_MS thereafter.
+next_id_ms = utime.ticks_ms()
+
 while True:
+    now = utime.ticks_ms()
+    if utime.ticks_diff(now, next_id_ms) >= 0:
+        try:
+            send_station_id()
+        except Exception as e:
+            print("ID error:", e)
+        next_id_ms = utime.ticks_add(now, ID_INTERVAL_MS)
+
     try:
         t, p, h = read_bme280()
         print(f"[{utime.ticks_ms()//1000}s] Temp: {t:.2f}\u00b0C | Pressure: {p:.1f} hPa | Humidity: {h:.1f}%")
