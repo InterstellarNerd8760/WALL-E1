@@ -49,26 +49,30 @@ dig_P9 = int.from_bytes(i2c.readfrom_mem(0x76, 0x9E, 2), "little")
 if dig_P9 & 0x8000:
     dig_P9 = dig_P9 - 0x10000
 
-# Humidity — known-broken packing vs Bosch datasheet (H1 size, H4/H5, missing H6)
-dig_H1 = int.from_bytes(i2c.readfrom_mem(0x76, 0xA1, 2), "little")
+# Humidity — Bosch datasheet packing (H1/H3 = 1 byte; H4/H5 = 12-bit; H6 present)
+dig_H1 = i2c.readfrom_mem(0x76, 0xA1, 1)[0]
 dig_H2 = int.from_bytes(i2c.readfrom_mem(0x76, 0xE1, 2), "little")
 if dig_H2 & 0x8000:
     dig_H2 = dig_H2 - 0x10000
-dig_H3 = int.from_bytes(i2c.readfrom_mem(0x76, 0xE3, 2), "little")
-if dig_H3 & 0x8000:
-    dig_H3 = dig_H3 - 0x10000
-dig_H4 = int.from_bytes(i2c.readfrom_mem(0x76, 0xE4, 2), "little")
-if dig_H4 & 0x8000:
-    dig_H4 = dig_H4 - 0x10000
-dig_H5 = int.from_bytes(i2c.readfrom_mem(0x76, 0xE4, 2), "little")
-if dig_H5 & 0x8000:
-    dig_H5 = dig_H5 - 0x10000
+dig_H3 = i2c.readfrom_mem(0x76, 0xE3, 1)[0]
+e4, e5, e6 = i2c.readfrom_mem(0x76, 0xE4, 3)
+dig_H4 = (e4 << 4) | (e5 & 0x0F)
+if dig_H4 & 0x800:
+    dig_H4 = dig_H4 - 0x1000
+dig_H5 = (e6 << 4) | (e5 >> 4)
+if dig_H5 & 0x800:
+    dig_H5 = dig_H5 - 0x1000
+dig_H6 = i2c.readfrom_mem(0x76, 0xE7, 1)[0]
+if dig_H6 & 0x80:
+    dig_H6 = dig_H6 - 0x100
 
 print("Calibration loaded successfully")
 
 
 def read_bme280():
-    # Trigger measurement — forced mode, temp+pressure 1x. Humidity ctrl_hum not written.
+    # ctrl_hum must be written before ctrl_meas to take effect (osrs_h = 1).
+    i2c.writeto_mem(0x76, 0xF2, b"\x01")
+    # Forced mode, temp+pressure 1x.
     i2c.writeto_mem(0x76, 0xF4, b"\x25")
     sleep(0.2)
 
@@ -101,12 +105,26 @@ def read_bme280():
         pressure = ((pressure + var1 + var2) >> 15) + (dig_P7 << 4)
         pressure = pressure / 25600.0
 
+    # Bosch BME280 humidity compensation
     v_x1 = t_fine - 76800
-    v_x2 = (((dig_H4 * 64) + (v_x1 * dig_H5)) >> 12) * h
-    v_x3 = v_x2 - (((dig_H2 * v_x1 * v_x1) >> 15) * dig_H5)
-    v_x4 = v_x3 + (dig_H3 * ((v_x1 * v_x1) >> 7))
-    humidity = v_x4 >> 12
-    humidity = humidity / 1024.0 * 100.0
+    v_x1 = (
+        ((((h << 14) - (dig_H4 << 20) - (dig_H5 * v_x1)) + 16384) >> 15)
+        * (
+            (
+                ((((v_x1 * dig_H6) >> 10) * (((v_x1 * dig_H3) >> 11) + 32768)) >> 10)
+                + 2097152
+            )
+            * dig_H2
+            + 8192
+        )
+        >> 14
+    )
+    v_x1 = v_x1 - (((((v_x1 >> 15) * (v_x1 >> 15)) >> 7) * dig_H1) >> 4)
+    if v_x1 < 0:
+        v_x1 = 0
+    if v_x1 > 419430400:
+        v_x1 = 419430400
+    humidity = (v_x1 >> 12) / 1024.0
     if humidity > 100.0:
         humidity = 100.0
     if humidity < 0.0:
@@ -139,7 +157,9 @@ while True:
 
     try:
         t, p, h = read_bme280()
-        print(f"[{utime.ticks_ms()//1000}s] Temp: {t:.2f}\u00b0C | Pressure: {p:.1f} hPa | Humidity: {h:.1f}%")
+        print(
+            f"[{utime.ticks_ms() // 1000}s] Temp: {t:.2f}\u00b0C | Pressure: {p:.1f} hPa | Humidity: {h:.1f}%"
+        )
     except Exception as e:
         print("Read error:", e)
     sleep(3.14)
