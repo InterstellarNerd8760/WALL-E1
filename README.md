@@ -14,6 +14,8 @@ Payload will collect atmospheric data, log it onboard, and send telemetry to the
 ## Status
 
 - Firmware reads the BME280 over I2C and prints temp / pressure / humidity every ~3.14 s.
+- Humidity uses Bosch cal packing + `ctrl_hum` + datasheet compensation (merged).
+- Part 97 station ID (`KO6OGZ WALL-E1`) prints on a separate 10-minute timer (serial stub until LoRa stacks).
 - No altitude, SD log, or LoRa TX in firmware yet.
 - Mission Control is a **simulated** flight so the UI can be built before radio works: Fair Oaks launch, baro-shaped telemetry, LoRa packet log, SpotTrace-shaped track.
 - Live Pico / SX1262 / FindMeSPOT ingest is not wired.
@@ -43,6 +45,7 @@ This is not a compiled image. Thonny copies a file onto the board.
 4. Save **to the Pico** as `/main.py` (File → Save as → Raspberry Pi Pico).
 5. Reset or Run. Serial should look like:
    `[12s] Temp: 22.41°C | Pressure: 1013.2 hPa | Humidity: …`
+   and periodically `[ID] KO6OGZ WALL-E1`.
 
 `/main.py` on the Pico is what runs on boot. Keep that copy in sync with GitHub after each change.
 
@@ -50,13 +53,9 @@ If Thonny drops `/dev/cu.usbmodem…` or the Mac USB serial dies, that is **not*
 
 ### Known firmware issues
 
-Matches the last working Thonny script, bugs included:
-
-- Humidity calibration bytes are wrong (H1 length, H4/H5 packing, missing H6).
-- `ctrl_hum` (`0xF2`) is never written, so humidity may not be sampled.
-- Humidity compensation is not the Bosch formula.
 - Recurring I2C `EIO` is intermittent contact/solder on the BME280, not this script. Works when the pins are pressed hard.
 - Team soldering iron / solder is not good enough for a reliable rework yet.
+- LoRa / SX1262 TX not wired yet (Pico still headerless; HAT cannot stack).
 
 ## Mission Control
 
