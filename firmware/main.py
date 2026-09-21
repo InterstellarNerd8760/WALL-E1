@@ -5,7 +5,8 @@ import utime
 print("=== WALL-E Flight Computer ===")
 
 # Part 97 station ID — separate from the ~3.14 s telemetry loop.
-# LoRa TX not wired yet (HAT cannot stack until Pico has headers).
+# LoRa TX parked until BME280 path works. HAT has male headers and stacks
+# straight on the headerless Pico (no Pico-side headers required).
 CALLSIGN = "KO6OGZ"
 ID_PAYLOAD = "KO6OGZ WALL-E1"
 ID_INTERVAL_MS = 10 * 60 * 1000  # 10 minutes
@@ -137,8 +138,8 @@ def send_station_id():
     """Station ID callout (Part 97: at least every 10 minutes).
 
     Serial-only for now. TODO(SX1262): TX ID_PAYLOAD over Waveshare Pico-LoRa
-    once the HAT is stacked — do not init SPI here (would risk wedging boot
-    without the radio present).
+    once BME280 works and RF is green-lit — do not init SPI here (would risk
+    wedging boot without the radio present).
     """
     print(f"[ID] {ID_PAYLOAD}")
 
