@@ -26,7 +26,7 @@ First major victory is still: collect sensor data **and** transmit a LoRa packet
 ## Hardware
 
 - Raspberry Pi Pico, MicroPython
-- BME280 on I2C0: SDA=`GP0`, SCL=`GP1`, address `0x76`
+- BME280 on I2C0: SDA=`GP16` (physical pin 21), SCL=`GP17` (physical pin 22), 100 kHz, address `0x76`
 - Waveshare Pico-LoRa SX1262 Node (HF, 850–930 MHz) — Pico-footprint HAT, stack, do not hand-wire SPI
 - IPEX-1 pigtail seated on the HAT U.FL jack → SMA
 - `ANT_SW`: A=`3V3`, B=`GP22`
