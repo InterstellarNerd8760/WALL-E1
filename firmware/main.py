@@ -11,7 +11,8 @@ CALLSIGN = "KO6OGZ"
 ID_PAYLOAD = "KO6OGZ WALL-E1"
 ID_INTERVAL_MS = 10 * 60 * 1000  # 10 minutes
 
-i2c = I2C(0, sda=Pin(0), scl=Pin(1))
+# BME280 breadboard wiring: SDA=GP16 (physical pin 21), SCL=GP17 (physical pin 22).
+i2c = I2C(0, sda=Pin(16), scl=Pin(17), freq=100000)
 
 # Calibration coefficients
 # Temp
